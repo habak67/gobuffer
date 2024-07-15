@@ -79,7 +79,7 @@ type Buffer[T any] struct {
 
 // Read reads the next element from the Buffer. If there are no elements to read false is returned.
 func (b *Buffer[T]) Read() (element T, ok bool) {
-	if b.buffered() <= 0 {
+	if b.Buffered() <= 0 {
 		return
 	}
 	ok = true
@@ -145,8 +145,8 @@ func (b *Buffer[T]) Grow(size int) {
 	}
 }
 
-// buffered returns the number of unread elements in the Buffer.
-func (b *Buffer[T]) buffered() int {
+// Buffered returns the number of unread elements in the Buffer.
+func (b *Buffer[T]) Buffered() int {
 	return b.write.AbsolutePos() - b.read.AbsolutePos()
 }
 

@@ -320,14 +320,14 @@ func TestBuffer(t *testing.T) {
 				case opCommit:
 					buf.Commit()
 				case opBuffered:
-					n := buf.buffered()
+					n := buf.Buffered()
 					if n != op.Exp {
 						t.Errorf("[%d] unexpected buffered:\nexp=%d\ngot=%d", i, op.Exp, n)
 					}
 				case opEOF:
 					// EOF means no elements to read in Buffer
-					if buf.buffered() != 0 {
-						t.Errorf("[%d] expected empty Buffer (%d)", i, buf.buffered())
+					if buf.Buffered() != 0 {
+						t.Errorf("[%d] expected empty Buffer (%d)", i, buf.Buffered())
 					}
 				}
 			}
