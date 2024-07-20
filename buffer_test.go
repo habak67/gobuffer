@@ -20,6 +20,25 @@ func TestBufferRollback_ZeroStateError(t *testing.T) {
 	}
 }
 
+func TestBufferRollback_IllegalStateError(t *testing.T) {
+	buf, err := NewWithSize[rune](5, 4)
+	if err != nil {
+		t.Errorf("unexpected error creating buffer: %v", err)
+	}
+	for i := 0; i < 15; i++ {
+		buf.Write('a')
+	}
+	state := buf.State()
+	for i := 0; i < 10; i++ {
+		_, _ = buf.Read()
+	}
+	buf.Commit()
+	err = buf.Rollback(state)
+	if err == nil || err.Error() != IllegalStateError.Error() {
+		t.Errorf("unexpected error rollback illegal state: %v", err)
+	}
+}
+
 func TestBufferPos(t *testing.T) {
 	rowSize := 10
 	tests := []struct {

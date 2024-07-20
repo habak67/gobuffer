@@ -47,7 +47,7 @@ type State struct {
 	init  bool
 }
 
-func (s State) zero() bool {
+func (s State) Zero() bool {
 	return !s.init
 }
 
@@ -118,7 +118,7 @@ func (b *Buffer[T]) State() State {
 // anymore. If such the case an IllegalStateError is returned. To mitigate such errors it is recommended only
 // rollback to states created after the last commit.
 func (b *Buffer[T]) Rollback(state State) error {
-	if state.zero() {
+	if state.Zero() {
 		return ZeroStateError
 	}
 	// Check if state is still valid (not created before a call to commit)
