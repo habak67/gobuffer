@@ -21,10 +21,7 @@ func TestBufferRollback_ZeroStateError(t *testing.T) {
 }
 
 func TestBufferRollback_IllegalStateError(t *testing.T) {
-	buf, err := NewWithSize[rune](5, 4)
-	if err != nil {
-		t.Errorf("unexpected error creating buffer: %v", err)
-	}
+	buf := NewWithSize[rune](5, 4)
 	for i := 0; i < 15; i++ {
 		buf.Write('a')
 	}
@@ -33,10 +30,42 @@ func TestBufferRollback_IllegalStateError(t *testing.T) {
 		_, _ = buf.Read()
 	}
 	buf.Commit()
-	err = buf.Rollback(state)
+	err := buf.Rollback(state)
 	if err == nil || err.Error() != IllegalStateError.Error() {
 		t.Errorf("unexpected error rollback illegal state: %v", err)
 	}
+}
+
+func TestNewWithSize_ZeroRowSizePanic(t *testing.T) {
+	defer func() { _ = recover() }()
+
+	_ = NewWithSize[rune](0, 2)
+	// Never reaches here if `OtherFunctionThatPanics` panics.
+	t.Errorf("expected NewWithSize to panic")
+}
+
+func TestNewWithSize_NegativeRowSizePanic(t *testing.T) {
+	defer func() { _ = recover() }()
+
+	_ = NewWithSize[rune](-5, 2)
+	// Never reaches here if `OtherFunctionThatPanics` panics.
+	t.Errorf("expected NewWithSize to panic")
+}
+
+func TestNewWithSize_ZeroRowsPanic(t *testing.T) {
+	defer func() { _ = recover() }()
+
+	_ = NewWithSize[rune](10, 0)
+	// Never reaches here if `OtherFunctionThatPanics` panics.
+	t.Errorf("expected NewWithSize to panic")
+}
+
+func TestNewWithSize_NegativeRowsPanic(t *testing.T) {
+	defer func() { _ = recover() }()
+
+	_ = NewWithSize[rune](10, -1)
+	// Never reaches here if `OtherFunctionThatPanics` panics.
+	t.Errorf("expected NewWithSize to panic")
 }
 
 func TestBufferPos(t *testing.T) {
@@ -295,10 +324,7 @@ func TestBuffer(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var state State
-			buf, err := NewWithSize[rune](rowSize, rows)
-			if err != nil {
-				t.Errorf("unexpected error creating Buffer: %s", err)
-			}
+			buf := NewWithSize[rune](rowSize, rows)
 			for i, o := range test.ops {
 				switch op := o.(type) {
 				case opRead[rune]:
@@ -332,7 +358,7 @@ func TestBuffer(t *testing.T) {
 				case opState:
 					state = buf.State()
 				case opRollback:
-					err = buf.Rollback(state)
+					err := buf.Rollback(state)
 					if !errors.Is(err, op.Err) {
 						t.Errorf("[%d] unexpected error:\nexp=%v\ngot=%v", i, op.Err, err)
 					}

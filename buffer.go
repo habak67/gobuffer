@@ -156,15 +156,18 @@ func (b *Buffer[T]) bufferPos(pos position) (row, col int) {
 
 // New creates a new Buffer holding objects of the specified type.
 func New[T any]() (buf *Buffer[T]) {
-	buf, _ = NewWithSize[T](10, 5)
+	buf = NewWithSize[T](10, 5)
 	return
 }
 
 // NewWithSize creates a new Buffer with the specified row size. The Buffer is pre-allocated with the specified
-// number of rows.
-func NewWithSize[T any](rowSize, rows int) (buf *Buffer[T], err error) {
+// number of rows. If row size or number of rows is <= 0 then a panic is raised.
+func NewWithSize[T any](rowSize, rows int) (buf *Buffer[T]) {
 	if rowSize <= 0 {
-		return nil, fmt.Errorf("illegal non-positive row size %d", rowSize)
+		panic(fmt.Errorf("illegal non-positive row size %d", rowSize))
+	}
+	if rows <= 0 {
+		panic(fmt.Errorf("illegal non-positive number of rows %d", rowSize))
 	}
 	buf = &Buffer[T]{
 		rowSize: rowSize,
