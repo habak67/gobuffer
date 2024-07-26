@@ -8,15 +8,15 @@ import (
 func TestBufferRollback_ZeroStateError(t *testing.T) {
 	buf := New[rune]()
 	buf.Write('a')
-	_, _ = buf.Read()
+	buf.Consume()
 	buf.Write('b')
 	err := buf.Rollback(State{})
 	if err == nil || err.Error() != ZeroStateError.Error() {
 		t.Errorf("unexpected error rollback zero state: %s", err)
 	}
-	r, _ := buf.Read()
+	r, _ := buf.Next()
 	if r != 'b' {
-		t.Errorf("expected read 'b' (got %c)", r)
+		t.Errorf("expected next to be 'b' (got %c)", r)
 	}
 }
 
@@ -27,7 +27,7 @@ func TestBufferRollback_IllegalStateError(t *testing.T) {
 	}
 	state := buf.State()
 	for i := 0; i < 10; i++ {
-		_, _ = buf.Read()
+		buf.Consume()
 	}
 	buf.Commit()
 	err := buf.Rollback(state)
@@ -115,28 +115,31 @@ func TestBuffer(t *testing.T) {
 		ops  []any
 	}{
 		{
-			"single write and read", []any{
+			"single write and next", []any{
 				opWrite[rune]{Elem: 'a'},
-				opRead[rune]{Exp: 'a'},
+				opNext[rune]{Exp: 'a'},
+				opConsume{},
 				opEOF{},
 			},
 		},
 		{
-			"multiple write and read", []any{
+			"multiple write and multiple next", []any{
 				opWrite[rune]{Elem: 'a'},
 				opWrite[rune]{Elem: 'b'},
-				opWrite[rune]{Elem: 'c'},
-				opRead[rune]{Exp: 'a'},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
+				opNext[rune]{Exp: 'a'},
+				opConsume{},
+				opNext[rune]{Exp: 'b'},
+				opNext[rune]{Exp: 'b'},
+				opNext[rune]{Exp: 'b'},
+				opConsume{},
 				opEOF{},
 			},
 		},
 		{
-			"read no unread", []any{
+			"next no unread elements", []any{
 				opWrite[rune]{Elem: 'a'},
-				opRead[rune]{Exp: 'a'},
-				opReadNotOk{},
+				opNextAndConsume[rune]{Exp: 'a'},
+				opNextNotOk{},
 				opEOF{},
 			},
 		},
@@ -149,13 +152,13 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: 'e'},
 				opWrite[rune]{Elem: 'f'},
 				opWrite[rune]{Elem: 'g'},
-				opRead[rune]{Exp: 'a'},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
-				opRead[rune]{Exp: 'd'},
-				opRead[rune]{Exp: 'e'},
-				opRead[rune]{Exp: 'f'},
-				opRead[rune]{Exp: 'g'},
+				opNextAndConsume[rune]{Exp: 'a'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opNextAndConsume[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: 'd'},
+				opNextAndConsume[rune]{Exp: 'e'},
+				opNextAndConsume[rune]{Exp: 'f'},
+				opNextAndConsume[rune]{Exp: 'g'},
 				opEOF{},
 			},
 		},
@@ -173,46 +176,21 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: '0'},
 				opWrite[rune]{Elem: '1'},
 				opWrite[rune]{Elem: '2'},
-				opRead[rune]{Exp: '1'},
-				opRead[rune]{Exp: '2'},
-				opRead[rune]{Exp: '3'},
-				opRead[rune]{Exp: '4'},
-				opRead[rune]{Exp: '5'},
-				opRead[rune]{Exp: '6'},
-				opRead[rune]{Exp: '7'},
+				opNextAndConsume[rune]{Exp: '1'},
+				opNextAndConsume[rune]{Exp: '2'},
+				opNextAndConsume[rune]{Exp: '3'},
+				opNextAndConsume[rune]{Exp: '4'},
+				opNextAndConsume[rune]{Exp: '5'},
+				opNextAndConsume[rune]{Exp: '6'},
+				opNextAndConsume[rune]{Exp: '7'},
 				opCommit{},
-				opRead[rune]{Exp: '8'},
+				opNextAndConsume[rune]{Exp: '8'},
 				opWrite[rune]{Elem: 'a'},
-				opRead[rune]{Exp: '9'},
-				opRead[rune]{Exp: '0'},
-				opRead[rune]{Exp: '1'},
-				opRead[rune]{Exp: '2'},
-				opRead[rune]{Exp: 'a'},
-				opEOF{},
-			},
-		},
-		{
-			"single unread", []any{
-				opWrite[rune]{Elem: 'a'},
-				opWrite[rune]{Elem: 'b'},
-				opRead[rune]{Exp: 'a'},
-				opUnread{},
-				opRead[rune]{Exp: 'a'},
-				opRead[rune]{Exp: 'b'},
-				opEOF{},
-			},
-		},
-		{
-			"multiple unread", []any{
-				opWrite[rune]{Elem: 'a'},
-				opWrite[rune]{Elem: 'b'},
-				opRead[rune]{Exp: 'a'},
-				opWrite[rune]{Elem: 'c'},
-				opUnread{},
-				opUnread{},
-				opRead[rune]{Exp: 'a'},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: '9'},
+				opNextAndConsume[rune]{Exp: '0'},
+				opNextAndConsume[rune]{Exp: '1'},
+				opNextAndConsume[rune]{Exp: '2'},
+				opNextAndConsume[rune]{Exp: 'a'},
 				opEOF{},
 			},
 		},
@@ -222,17 +200,17 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: 'b'},
 				opWrite[rune]{Elem: 'c'},
 				opCommit{},
-				opRead[rune]{Exp: 'a'},
+				opNextAndConsume[rune]{Exp: 'a'},
 				opState{},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opNextAndConsume[rune]{Exp: 'c'},
 				opWrite[rune]{Elem: 'd'},
 				opRollback{},
 				opWrite[rune]{Elem: 'e'},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
-				opRead[rune]{Exp: 'd'},
-				opRead[rune]{Exp: 'e'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opNextAndConsume[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: 'd'},
+				opNextAndConsume[rune]{Exp: 'e'},
 				opEOF{},
 			},
 		},
@@ -240,9 +218,9 @@ func TestBuffer(t *testing.T) {
 			"rollback to non-existing position", []any{
 				opWrites[rune]{Elem: 'a', Num: 20},
 				opState{},
-				opReads{Num: 15},
+				opConsumes{Num: 15},
 				opCommit{},
-				opRead[rune]{Exp: 'a'},
+				opNext[rune]{Exp: 'a'},
 				opRollback{Err: IllegalStateError},
 			},
 		},
@@ -259,22 +237,22 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: '9'},
 				opWrite[rune]{Elem: '0'},
 				opWrite[rune]{Elem: '1'},
-				opRead[rune]{Exp: '1'},
-				opRead[rune]{Exp: '2'},
-				opRead[rune]{Exp: '3'},
-				opRead[rune]{Exp: '4'},
-				opRead[rune]{Exp: '5'},
-				opRead[rune]{Exp: '6'},
-				opRead[rune]{Exp: '7'},
+				opNextAndConsume[rune]{Exp: '1'},
+				opNextAndConsume[rune]{Exp: '2'},
+				opNextAndConsume[rune]{Exp: '3'},
+				opNextAndConsume[rune]{Exp: '4'},
+				opNextAndConsume[rune]{Exp: '5'},
+				opNextAndConsume[rune]{Exp: '6'},
+				opNextAndConsume[rune]{Exp: '7'},
 				opCommit{},
 				opState{},
-				opRead[rune]{Exp: '8'},
-				opRead[rune]{Exp: '9'},
+				opNextAndConsume[rune]{Exp: '8'},
+				opNextAndConsume[rune]{Exp: '9'},
 				opRollback{},
-				opRead[rune]{Exp: '8'},
-				opRead[rune]{Exp: '9'},
-				opRead[rune]{Exp: '0'},
-				opRead[rune]{Exp: '1'},
+				opNextAndConsume[rune]{Exp: '8'},
+				opNextAndConsume[rune]{Exp: '9'},
+				opNextAndConsume[rune]{Exp: '0'},
+				opNextAndConsume[rune]{Exp: '1'},
 				opEOF{},
 			},
 		},
@@ -289,14 +267,30 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: 'f'},
 				opWrite[rune]{Elem: 'g'},
 				opBuffered{Exp: 7},
-				opRead[rune]{Exp: 'a'},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: 'a'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opNextAndConsume[rune]{Exp: 'c'},
 				opBuffered{Exp: 4},
-				opRead[rune]{Exp: 'd'},
-				opRead[rune]{Exp: 'e'},
-				opRead[rune]{Exp: 'f'},
-				opRead[rune]{Exp: 'g'},
+				opNextAndConsume[rune]{Exp: 'd'},
+				opNextAndConsume[rune]{Exp: 'e'},
+				opNextAndConsume[rune]{Exp: 'f'},
+				opNextAndConsume[rune]{Exp: 'g'},
+				opBuffered{Exp: 0},
+				opEOF{},
+			},
+		},
+		{
+			"buffered with only next", []any{
+				opWrite[rune]{Elem: 'a'},
+				opWrite[rune]{Elem: 'b'},
+				opBuffered{Exp: 2},
+				opNext[rune]{Exp: 'a'},
+				opNext[rune]{Exp: 'a'},
+				opNext[rune]{Exp: 'a'},
+				opBuffered{Exp: 2},
+				opNextAndConsume[rune]{Exp: 'a'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opBuffered{Exp: 0},
 				opEOF{},
 			},
 		},
@@ -306,17 +300,17 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: 'b'},
 				opWrite[rune]{Elem: 'c'},
 				opWrite[rune]{Elem: 'd'},
-				opRead[rune]{Exp: 'a'},
+				opNextAndConsume[rune]{Exp: 'a'},
 				opBuffered{Exp: 3},
 				opState{},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opNextAndConsume[rune]{Exp: 'c'},
 				opBuffered{Exp: 1},
 				opRollback{},
 				opBuffered{Exp: 3},
-				opRead[rune]{Exp: 'b'},
-				opRead[rune]{Exp: 'c'},
-				opRead[rune]{Exp: 'd'},
+				opNextAndConsume[rune]{Exp: 'b'},
+				opNextAndConsume[rune]{Exp: 'c'},
+				opNextAndConsume[rune]{Exp: 'd'},
 				opEOF{},
 			},
 		},
@@ -327,34 +321,40 @@ func TestBuffer(t *testing.T) {
 			buf := NewWithSize[rune](rowSize, rows)
 			for i, o := range test.ops {
 				switch op := o.(type) {
-				case opRead[rune]:
-					r, ok := buf.Read()
+				case opNext[rune]:
+					r, ok := buf.Next()
 					if !ok {
 						t.Errorf("[%d] unexpected read not ok", i)
 					}
 					if r != op.Exp {
 						t.Errorf("[%d] unexpected rune read:\nexp=%c\ngot=%c", i, op.Exp, r)
 					}
-				case opReadNotOk:
-					_, ok := buf.Read()
+				case opNextNotOk:
+					_, ok := buf.Next()
 					if ok {
 						t.Errorf("[%d] unexpected read ok", i)
 					}
+				case opNextAndConsume[rune]:
+					r, ok := buf.Next()
+					if !ok {
+						t.Errorf("[%d] unexpected read not ok", i)
+					}
+					if r != op.Exp {
+						t.Errorf("[%d] unexpected rune read:\nexp=%c\ngot=%c", i, op.Exp, r)
+					}
+					buf.Consume()
 				case opWrite[rune]:
 					buf.Write(op.Elem)
 				case opWrites[rune]:
 					for j := 0; j < op.Num; j++ {
 						buf.Write(op.Elem)
 					}
-				case opReads:
+				case opConsume:
+					buf.Consume()
+				case opConsumes:
 					for j := 0; j < op.Num; j++ {
-						_, ok := buf.Read()
-						if !ok {
-							t.Errorf("[%d] unexpected read not ok", i)
-						}
+						buf.Consume()
 					}
-				case opUnread:
-					buf.Unread()
 				case opState:
 					state = buf.State()
 				case opRollback:
@@ -380,13 +380,15 @@ func TestBuffer(t *testing.T) {
 	}
 }
 
-type opRead[T any] struct {
+type opNext[T any] struct {
 	Exp T
-	Ok  bool
-	Err error
 }
 
-type opReadNotOk struct{}
+type opNextAndConsume[T any] struct {
+	Exp T
+}
+
+type opNextNotOk struct{}
 
 type opWrite[T any] struct {
 	Elem T
@@ -397,11 +399,11 @@ type opWrites[T any] struct {
 	Num  int
 }
 
-type opReads struct {
+type opConsume struct{}
+
+type opConsumes struct {
 	Num int
 }
-
-type opUnread struct{}
 
 type opState struct{}
 

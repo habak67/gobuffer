@@ -47,10 +47,6 @@ type State struct {
 	init  bool
 }
 
-func (s State) Zero() bool {
-	return !s.init
-}
-
 func newState(read, write position) State {
 	return State{
 		read:  read,
@@ -61,11 +57,21 @@ func newState(read, write position) State {
 
 // Buffer is a dynamic FIFO Buffer holding elements of the specified type. The Buffer grows with increments of
 // the configured row size. The Buffer supports read, write, unread and rollback to a previously collected state.
+// A Buffer supports two models for lookahead.
 //
-// You may "unread" a buffer as many times as there has been writes to the buffer. To mitigate a Buffer to grow
-// infinitely a Buffer may be committed to remove previously read elements. After a commit you may only unread
-// elements that has been written after the last commit (technically you may unread elements to the beginning
-// of the first row after the commit).
+// Buffer supports one element lookahead using the common next/consume pattern. When calling Buffer.Next the
+// next unread element is returned. Consecutive calls to Buffer.Next will return the same element. The current
+// next element may be consumed by calling Buffer.Consume. The next call to Buffer.Next will return the element
+// after the consumed element.
+//
+// Buffer also supports multiple element lookahead using rollbacks to a saved state. Buffer.State creates a
+// state. A call to Buffer.Rollback will rollback to the provided state. After a rollback the next element
+// returned by Buffer.Next will be the "next element" when the state was created. Note that written elements
+// are still available in the Buffer after a rollback. In that sense the state is a "read state".
+//
+// To mitigate a Buffer to grow infinitely a Buffer may be committed to remove previously read elements by calling
+// Buffer.Commit. After a commit all elements consumed before the commit will be removed (technically consumed
+// elements in the buffer row where the read pointer is located will still be available in the Buffer).
 //
 // Even if a buffer technically may be indefinitely big the implementation is by no means optimized for bigger
 // buffers. Instead the buffer is developed to hold smaller number of elements at the same time (between commits).
@@ -77,22 +83,22 @@ type Buffer[T any] struct {
 	write    position // write points to the position where the next element should be written.
 }
 
-// Read reads the next element from the Buffer. If there are no elements to read false is returned.
-func (b *Buffer[T]) Read() (element T, ok bool) {
+// Next returns the next element from the Buffer. If such next element exist then true is returned. If there
+// are no unread elements in the buffer then false is returned.
+func (b *Buffer[T]) Next() (element T, ok bool) {
 	if b.Buffered() <= 0 {
 		return
 	}
 	ok = true
 	row, col := b.bufferPos(b.read)
 	element = b.buffers[row][col]
-	b.read = b.read.Move(1)
 	return
 }
 
-// Unread will unread the last read element from the Buffer. The next element to read will be the previously
-// read element.
-func (b *Buffer[T]) Unread() {
-	b.read = b.read.Move(-1)
+// Consume will consume the next element (returned by Buffer.Next) in the Buffer. The next element (returned by
+// Buffer.Next) will be the element after the previous next element.
+func (b *Buffer[T]) Consume() {
+	b.read = b.read.Move(1)
 }
 
 // Write writes an element to the Buffer. If needed the Buffer is grown to hold the element.
@@ -118,7 +124,7 @@ func (b *Buffer[T]) State() State {
 // anymore. If such the case an IllegalStateError is returned. To mitigate such errors it is recommended only
 // rollback to states created after the last commit.
 func (b *Buffer[T]) Rollback(state State) error {
-	if state.Zero() {
+	if !state.init {
 		return ZeroStateError
 	}
 	// Check if state is still valid (not created before a call to commit)
@@ -129,7 +135,8 @@ func (b *Buffer[T]) Rollback(state State) error {
 	return nil
 }
 
-// Commit removes Buffer rows before the current read pointer. This will mitigate the Buffer to grow indefinitely.
+// Commit will remove consumed elements from the Buffer mitigating the Buffer to grow indefinitely. Technically
+// Commit removes buffer rows before the current read pointer.
 func (b *Buffer[T]) Commit() {
 	// Cleanup unreachable Buffer rows
 	row, _ := b.bufferPos(b.read)
@@ -145,7 +152,7 @@ func (b *Buffer[T]) Grow(size int) {
 	}
 }
 
-// Buffered returns the number of unread elements in the Buffer.
+// Buffered returns the number of unconsumed elements in the Buffer.
 func (b *Buffer[T]) Buffered() int {
 	return b.write.AbsolutePos() - b.read.AbsolutePos()
 }
