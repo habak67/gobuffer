@@ -119,18 +119,29 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: 'a'},
 				opNext[rune]{Exp: 'a'},
 				opConsume{},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
-			"multiple EOF at end", []any{
+			"multiple not ok at end", []any{
 				opWrite[rune]{Elem: 'a'},
 				opNextAndConsume[rune]{Exp: 'a'},
-				opEOF{},
+				opNextNotOk{},
 				opConsume{},
-				opEOF{},
+				opNextNotOk{},
 				opConsume{},
-				opEOF{},
+				opNextNotOk{},
+			},
+		},
+		{
+			"no ok at empty buffer", []any{
+				opConsume{},
+				opNextNotOk{},
+				opConsume{},
+				opNextNotOk{},
+				opWrite[rune]{Elem: 'a'},
+				opNextAndConsume[rune]{Exp: 'a'},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -141,9 +152,9 @@ func TestBuffer(t *testing.T) {
 				opNextNotOk{},
 				opConsume{},
 				opNextNotOk{},
-				opEOF{},
+				opNextNotOk{},
 				opConsume{},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -156,7 +167,7 @@ func TestBuffer(t *testing.T) {
 				opNext[rune]{Exp: 'b'},
 				opNext[rune]{Exp: 'b'},
 				opConsume{},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -164,7 +175,7 @@ func TestBuffer(t *testing.T) {
 				opWrite[rune]{Elem: 'a'},
 				opNextAndConsume[rune]{Exp: 'a'},
 				opNextNotOk{},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -183,7 +194,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: 'e'},
 				opNextAndConsume[rune]{Exp: 'f'},
 				opNextAndConsume[rune]{Exp: 'g'},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -215,7 +226,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: '1'},
 				opNextAndConsume[rune]{Exp: '2'},
 				opNextAndConsume[rune]{Exp: 'a'},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -235,7 +246,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: 'c'},
 				opNextAndConsume[rune]{Exp: 'd'},
 				opNextAndConsume[rune]{Exp: 'e'},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -277,7 +288,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: '9'},
 				opNextAndConsume[rune]{Exp: '0'},
 				opNextAndConsume[rune]{Exp: '1'},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -300,7 +311,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: 'f'},
 				opNextAndConsume[rune]{Exp: 'g'},
 				opBuffered{Exp: 0},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -315,7 +326,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: 'a'},
 				opNextAndConsume[rune]{Exp: 'b'},
 				opBuffered{Exp: 0},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 		{
@@ -335,7 +346,7 @@ func TestBuffer(t *testing.T) {
 				opNextAndConsume[rune]{Exp: 'b'},
 				opNextAndConsume[rune]{Exp: 'c'},
 				opNextAndConsume[rune]{Exp: 'd'},
-				opEOF{},
+				opNextNotOk{},
 			},
 		},
 	}
@@ -393,11 +404,6 @@ func TestBuffer(t *testing.T) {
 					if n != op.Exp {
 						t.Errorf("[%d] unexpected buffered:\nexp=%d\ngot=%d", i, op.Exp, n)
 					}
-				case opEOF:
-					// EOF means no elements to read in Buffer
-					if buf.Buffered() != 0 {
-						t.Errorf("[%d] expected empty Buffer (%d)", i, buf.Buffered())
-					}
 				}
 			}
 		})
@@ -440,5 +446,3 @@ type opCommit struct{}
 type opBuffered struct {
 	Exp int
 }
-
-type opEOF struct{}
