@@ -86,7 +86,7 @@ type Buffer[T any] struct {
 // Next returns the next element from the Buffer. If such next element exist then true is returned. If there
 // are no unread elements in the buffer then false is returned.
 func (b *Buffer[T]) Next() (element T, ok bool) {
-	if b.Buffered() <= 0 {
+	if b.Buffered() == 0 {
 		return
 	}
 	ok = true
@@ -98,7 +98,10 @@ func (b *Buffer[T]) Next() (element T, ok bool) {
 // Consume will consume the next element (returned by Buffer.Next) in the Buffer. The next element (returned by
 // Buffer.Next) will be the element after the previous next element.
 func (b *Buffer[T]) Consume() {
-	b.read = b.read.Move(1)
+	// We only consume if there is an element to consume
+	if b.Buffered() > 0 {
+		b.read = b.read.Move(1)
+	}
 }
 
 // Write writes an element to the Buffer. If needed the Buffer is grown to hold the element.

@@ -123,6 +123,30 @@ func TestBuffer(t *testing.T) {
 			},
 		},
 		{
+			"multiple EOF at end", []any{
+				opWrite[rune]{Elem: 'a'},
+				opNextAndConsume[rune]{Exp: 'a'},
+				opEOF{},
+				opConsume{},
+				opEOF{},
+				opConsume{},
+				opEOF{},
+			},
+		},
+		{
+			"consume when no next", []any{
+				opWrite[rune]{Elem: 'a'},
+				opNext[rune]{Exp: 'a'},
+				opConsume{},
+				opNextNotOk{},
+				opConsume{},
+				opNextNotOk{},
+				opEOF{},
+				opConsume{},
+				opEOF{},
+			},
+		},
+		{
 			"multiple write and multiple next", []any{
 				opWrite[rune]{Elem: 'a'},
 				opWrite[rune]{Elem: 'b'},
