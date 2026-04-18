@@ -13,10 +13,10 @@ type position struct {
 	Col     int
 }
 
-// Move will move the current position the specified number of steps. The moved position is returned. If steps
-// is > 0 then the position is moved forward and if steps < 0 then the position is moved backward. Note that the
+// Move will move the current position the specified number of ´steps´. The moved to position is returned. If 'steps'
+// is > 0 then the position is moved forward and if 'steps' < 0 then the position is moved backward. Note that the
 // lowest position is 0/0, and you may not move before that position. That is, if the current position is 0/3 and
-// steps is -5 then the new position will be 0/0.
+// 'steps' is -5 then the new position will be 0/0.
 func (p position) Move(steps int) position {
 	absPos := p.AbsolutePos() + steps
 	if absPos < 0 {
@@ -30,9 +30,9 @@ func (p position) Move(steps int) position {
 // AbsolutePos returns the absolute (one-dimensional) position. Note that position uses the standard array index
 // convention where the first position is 0. Example of absolute positions (row size is assumed to be 10).
 //
-//	Line: 0, Idx: 0 => 0
-//	Line: 0, Idx: 5 => 5
-//	Line: 2, Idx: 8 => 28
+//	Row: 0, Col: 0 => 0
+//	Row: 0, Col: 5 => 5
+//	Row: 2, Col: 8 => 28
 func (p position) AbsolutePos() int {
 	return p.Row*p.rowSize + p.Col
 }
@@ -74,7 +74,7 @@ func newState(read, write position) State {
 // elements in the buffer row where the read pointer is located will still be available in the Buffer).
 //
 // Even if a buffer technically may be indefinitely big the implementation is by no means optimized for bigger
-// buffers. Instead the buffer is developed to hold smaller number of elements at the same time (between commits).
+// buffers. Instead the buffer is implemented to hold smaller number of elements at the same time (between commits).
 type Buffer[T any] struct {
 	rowSize  int
 	startRow int // startRow holds the row number of the first row in the buffer.
@@ -112,7 +112,7 @@ func (b *Buffer[T]) Write(element T) {
 	b.write = b.write.Move(1)
 }
 
-// State return a Buffer state. The state may be used to backtrack to the current state.
+// State return a Buffer state. The state may be used to rollback to the current state.
 func (b *Buffer[T]) State() State {
 	return newState(b.read, b.write)
 }
@@ -138,8 +138,9 @@ func (b *Buffer[T]) Rollback(state State) error {
 	return nil
 }
 
-// Commit will remove consumed elements from the Buffer mitigating the Buffer to grow indefinitely. Technically
-// Commit removes buffer rows before the current read pointer.
+// Commit will remove consumed elements from the Buffer mitigating the Buffer to grow indefinitely. Note that
+// Commit may not necessarily remove all elements consumed. That is there may still be consumed elements available
+// in the Buffer.
 func (b *Buffer[T]) Commit() {
 	// Cleanup unreachable Buffer rows
 	row, _ := b.bufferPos(b.read)
